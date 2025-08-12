@@ -16,6 +16,7 @@ export function useConversationHistory(conversationId: string) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!conversationId) return; // Nothing to fetch without an id
     const fetchConversation = async () => {
       try {
         const response = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/conversations/${conversationId}`);
@@ -33,6 +34,17 @@ export function useConversationHistory(conversationId: string) {
       }
     };
     fetchConversation();
+  }, [conversationId]);
+
+  // Hydrate from localStorage first for instant UI
+  useEffect(() => {
+    if (typeof window === 'undefined' || !conversationId) return;
+    const locale = window.location.pathname.split('/')[1] || 'en';
+    const key = `chat_${locale}_messages_${conversationId}`;
+    try {
+      const cached = localStorage.getItem(key);
+      if (cached) setMessages(JSON.parse(cached));
+    } catch {}
   }, [conversationId]);
 
   return { messages, setMessages, avatar, error };

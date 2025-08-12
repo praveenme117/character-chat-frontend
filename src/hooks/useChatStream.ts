@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
 export interface ChatMessage {
   id: string;
@@ -15,6 +15,9 @@ export function useChatStream(
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const aiMessageRef = useRef<ChatMessage | null>(null);
+  const flushTimerRef = useRef<number | null>(null);
+  const tokenBufferRef = useRef<string>("");
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -29,33 +32,50 @@ export function useChatStream(
       };
       setMessages((prev) => [...prev, newMessage]);
 
+      const locale = typeof window !== 'undefined' ? (window.location.pathname.split('/')[1] || 'en') : 'en';
       const source = new EventSource(
-        `${
-          process.env.NEXT_PUBLIC_BACKEND_URL
-        }/api/chat/stream?conversationId=${conversationId}&message=${encodeURIComponent(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/chat/stream?conversationId=${conversationId}&message=${encodeURIComponent(
           content
-        )}&userData=${encodeURIComponent(JSON.stringify(userData))}`
+        )}&userData=${encodeURIComponent(JSON.stringify(userData))}&lang=${encodeURIComponent(locale)}`
       );
 
-      let aiMessage: ChatMessage = {
+      aiMessageRef.current = {
         id: crypto.randomUUID(),
         role: "assistant",
         content: "",
       };
-      setMessages((prev) => [...prev, aiMessage]);
+      setMessages((prev) => [...prev, aiMessageRef.current as ChatMessage]);
 
-      // Handle named SSE events
+      // Smooth buffered token handling
+      const scheduleFlush = () => {
+        if (flushTimerRef.current != null) return;
+        flushTimerRef.current = window.setTimeout(() => {
+          flushTimerRef.current = null;
+          const ai = aiMessageRef.current;
+          const chunk = tokenBufferRef.current;
+          if (!ai || !chunk) return;
+          tokenBufferRef.current = "";
+          ai.content += chunk;
+          setMessages((prev) => [...prev.slice(0, -1), { ...ai }]);
+        }, 40); // ~25fps smoothness
+      };
+
       source.addEventListener("token", (event) => {
         const data = JSON.parse((event as MessageEvent).data);
-        aiMessage.content += data.content;
-        setMessages((prev) => [
-          ...prev.slice(0, -1),
-          { ...aiMessage, content: aiMessage.content },
-        ]);
+        tokenBufferRef.current += data.content;
+        scheduleFlush();
       });
 
       source.addEventListener("done", () => {
         source.close();
+        // Final flush
+        const ai = aiMessageRef.current;
+        const chunk = tokenBufferRef.current;
+        if (ai && chunk) {
+          ai.content += chunk;
+          tokenBufferRef.current = "";
+          setMessages((prev) => [...prev.slice(0, -1), { ...ai }]);
+        }
         setIsStreaming(false);
         // Backend already saves message, no need to save here
       });
@@ -83,6 +103,16 @@ export function useChatStream(
     },
     [conversationId, userData]
   );
+
+  // Persist messages client-side per-locale and conversation for quick reloads
+  useEffect(() => {
+    if (typeof window === "undefined" || !conversationId) return;
+    const locale = window.location.pathname.split("/")[1] || "en";
+    const key = `chat_${locale}_messages_${conversationId}`;
+    try {
+      localStorage.setItem(key, JSON.stringify(messages));
+    } catch {}
+  }, [messages, conversationId]);
 
   return { messages, setMessages, isStreaming, error, sendMessage };
 }

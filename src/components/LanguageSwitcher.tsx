@@ -1,14 +1,49 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
+import { useEffect } from "react";
+import axios from "axios";
 
 export default function LanguageSwitcher() {
   const router = useRouter();
   const pathname = usePathname();
   const currentLocale = pathname.split("/")[1];
 
-  const changeLanguage = (locale: string) => {
-    const newPath = pathname.replace(/^\/[^\/]+/, `/${locale}`);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    // Touch keys to ensure they exist
+    ["chat_en_sessionId", "chat_ja_sessionId"].forEach(() => {});
+  }, []);
+
+  const changeLanguage = async (locale: string) => {
+    if (typeof window === "undefined") return;
+    const key = locale === "ja" ? "chat_ja_sessionId" : "chat_en_sessionId";
+    let targetSessionId = localStorage.getItem(key);
+
+    // If we're currently on a chat route, ensure we navigate to a session id for the new locale
+    const parts = pathname.split("/").filter(Boolean); // [locale, maybe 'chat', maybe id]
+    const isChatRoute = parts[1] === "chat";
+
+    if (isChatRoute && !targetSessionId) {
+      try {
+        const userData = { name: "User", city: "Unknown" };
+        const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/session`, {
+          avatarId: 1,
+          userData,
+        });
+        targetSessionId = response.data.sessionId;
+        localStorage.setItem(key, targetSessionId);
+      } catch (e) {
+        targetSessionId = "";
+      }
+    }
+
+    // Build destination path
+    let newPath = pathname.replace(/^\/[^\/]+/, `/${locale}`);
+    if (isChatRoute) {
+      const id = targetSessionId || parts[2] || "";
+      newPath = `/${locale}/chat/${id}`;
+    }
     router.push(newPath);
   };
 

@@ -12,29 +12,16 @@ export default async function LocaleLayout({
 
   try {
     const messages = await getMessages();
-
     return (
-      <html lang={locale || 'en'}>
-        <head>
-          <link rel="icon" href="/favicon.ico" />
-        </head>
-        <body>
-          <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
-        </body>
-      </html>
+      <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
     );
   } catch (error) {
     console.error('Failed to load messages:', error);
     return (
-      <html lang={locale || 'en'}>
-        <head>
-          <link rel="icon" href="/favicon.ico" />
-        </head>
-        <body>
-          <div>Error loading translations. Please try again.</div>
-          {children}
-        </body>
-      </html>
+      <div>
+        <div>Error loading translations. Please try again.</div>
+        {children}
+      </div>
     );
   }
 }

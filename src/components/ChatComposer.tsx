@@ -21,7 +21,7 @@ export default function ChatComposer({ isStreaming, sendMessage }: ChatComposerP
 
   return (
     <div className="w-full">
-      <form onSubmit={handleSubmit} className="glass-card p-2 flex gap-2">
+      <form onSubmit={handleSubmit} className="glass-card p-2 flex gap-2 sticky bottom-2">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
