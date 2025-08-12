@@ -80,7 +80,12 @@ export default function ChatPage({
   if (!conversationId || !userData) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div>Loading...</div>
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/20 via-purple-900/20 to-pink-900/20"></div>
+        <div className="relative z-10 glass-card text-center animate-fade-in-up">
+          <div className="loading-spinner mx-auto mb-4"></div>
+          <h3 className="text-white font-semibold mb-2">Initializing Chat</h3>
+          <p className="text-white/60 text-sm">Setting up your conversation...</p>
+        </div>
       </div>
     );
   }
@@ -88,30 +93,73 @@ export default function ChatPage({
   if (!avatar) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div>Loading avatar...</div>
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/20 via-purple-900/20 to-pink-900/20"></div>
+        <div className="relative z-10 glass-card text-center animate-fade-in-up">
+          <div className="loading-spinner mx-auto mb-4"></div>
+          <h3 className="text-white font-semibold mb-2">Loading Avatar</h3>
+          <p className="text-white/60 text-sm">Preparing your AI companion...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
-      <LanguageSwitcher />
+    <div className="flex flex-col min-h-screen p-4">
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/20 via-purple-900/20 to-pink-900/20"></div>
       
-      {error && <ErrorMessage message={error} />}
-      
-      <div className="flex flex-col items-center max-w-2xl w-full">
-        <ChatScreen 
-          avatar={avatar} 
-          isStreaming={isStreaming} 
-          isTyping={isTyping} 
-        />
+      <div className="relative z-10 flex flex-col h-full max-w-4xl mx-auto w-full">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
+          <div className="glass-card px-4 py-2">
+            <h1 className="text-white font-semibold">Chat Session</h1>
+          </div>
+          <LanguageSwitcher />
+        </div>
         
-        <ChatMessageList messages={allMessages} />
+        {error && <ErrorMessage message={error} />}
         
-        <ChatComposer 
-          isStreaming={isStreaming} 
-          sendMessage={handleSendMessage} 
-        />
+        {/* Main Chat Area */}
+        <div className="flex-1 flex flex-col lg:flex-row gap-6 min-h-0">
+          {/* Avatar Section */}
+          <div className="lg:w-1/3 flex flex-col items-center">
+            <div className="glass-card w-full max-w-sm text-center sticky top-4">
+              <ChatScreen 
+                avatar={avatar} 
+                isStreaming={isStreaming} 
+                isTyping={isTyping} 
+              />
+              
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center justify-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${isStreaming ? 'bg-green-400 animate-pulse' : isTyping ? 'bg-yellow-400 animate-pulse' : 'bg-gray-400'}`}></div>
+                  <span className="text-white/70 text-sm">
+                    {isStreaming ? 'Speaking...' : isTyping ? 'Listening...' : 'Ready'}
+                  </span>
+                </div>
+                
+                {userData && (
+                  <div className="text-white/50 text-xs">
+                    Hello, {userData.name}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          {/* Chat Section */}
+          <div className="lg:w-2/3 flex flex-col min-h-0">
+            <div className="flex-1 mb-4">
+              <ChatMessageList messages={allMessages} />
+            </div>
+            
+            <div className="mt-auto">
+              <ChatComposer 
+                isStreaming={isStreaming} 
+                sendMessage={handleSendMessage} 
+              />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
