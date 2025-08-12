@@ -25,8 +25,6 @@ export default function BackgroundMedia({ imageFallback, videoSrc, className, ov
     play();
   }, [videoSrc]);
 
-  console.log('BackgroundMedia rendering with imageFallback:', imageFallback, 'videoSrc:', videoSrc);
-  
   return (
     <div className={`fixed inset-0 z-0 ${className ?? ''}`}>
       {videoSrc ? (
