@@ -25,8 +25,10 @@ export default function BackgroundMedia({ imageFallback, videoSrc, className, ov
     play();
   }, [videoSrc]);
 
+  console.log('BackgroundMedia rendering with imageFallback:', imageFallback, 'videoSrc:', videoSrc);
+  
   return (
-    <div className={`absolute inset-0 -z-10 ${className ?? ''}`}>
+    <div className={`fixed inset-0 z-0 ${className ?? ''}`}>
       {videoSrc ? (
         <video
           ref={videoRef}
@@ -39,7 +41,13 @@ export default function BackgroundMedia({ imageFallback, videoSrc, className, ov
         />
       ) : imageFallback ? (
         // Use a plain img to ensure GIFs animate
-        <img src={imageFallback} alt="Background" className="w-full h-full object-cover" />
+        <img 
+          src={imageFallback} 
+          alt="Background" 
+          className="w-full h-full object-cover"
+          onLoad={() => console.log('Background image loaded:', imageFallback)}
+          onError={(e) => console.error('Background image failed to load:', imageFallback, e)}
+        />
       ) : null}
 
       {overlayGradient && (

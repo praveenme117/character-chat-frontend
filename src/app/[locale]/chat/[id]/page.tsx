@@ -115,6 +115,8 @@ export default function ChatPage({
     );
   }
 
+  console.log('ChatPage rendering with backgroundSrc:', backgroundSrc, 'avatar:', avatar);
+  
   return (
     <div className="relative flex flex-col min-h-screen p-4" onClick={() => setBgIndex((i) => i + 1)}>
       <BackgroundMedia imageFallback={backgroundSrc} />
