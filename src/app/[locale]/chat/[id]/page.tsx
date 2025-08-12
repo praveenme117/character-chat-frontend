@@ -22,12 +22,13 @@ export default function ChatPage({
 }) {
   const searchParams = useSearchParams();
   const [conversationId, setConversationId] = useState<string>('');
+  const [userData, setUserData] = useState<{ name: string; city: string } | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [bgIndex, setBgIndex] = React.useState(0);
   
   useEffect(() => {
     params.then((p) => setConversationId(p.id));
   }, [params]);
-  const [userData, setUserData] = useState<{ name: string; city: string } | null>(null);
-  const [isTyping, setIsTyping] = useState(false);
 
   // Parse userData from URL params
   useEffect(() => {
@@ -61,15 +62,23 @@ export default function ChatPage({
     sendMessage 
   } = useChatStream(conversationId, userData || { name: 'User', city: 'Unknown' });
 
-  // Combine history and streaming messages
-  const allMessages = historyMessages.length > 0 ? historyMessages : streamMessages;
-
   // Update stream messages when history loads
   useEffect(() => {
     if (historyMessages.length > 0) {
       setStreamMessages(historyMessages);
     }
   }, [historyMessages, setStreamMessages]);
+
+  // Media cycle for background - must be after avatar is available
+  const mediaCycle = useMemo(() => {
+    if (!avatar) return ['/images/still.gif', '/images/listening.gif', '/images/speaking.gif'];
+    return [avatar.staticUrl, avatar.listeningUrl, avatar.speakingUrl];
+  }, [avatar]);
+
+  // Combine history and streaming messages
+  const allMessages = historyMessages.length > 0 ? historyMessages : streamMessages;
+  const backgroundSrc = mediaCycle[bgIndex % mediaCycle.length];
+  const error = historyError || streamError;
 
   const handleSendMessage = async (content: string) => {
     setIsTyping(true);
@@ -79,8 +88,6 @@ export default function ChatPage({
       setIsTyping(false);
     }
   };
-
-  const error = historyError || streamError;
 
   if (!conversationId || !userData) {
     return (
@@ -107,10 +114,6 @@ export default function ChatPage({
       </div>
     );
   }
-
-  const mediaCycle = useMemo(() => [avatar.staticUrl, avatar.listeningUrl, avatar.speakingUrl], [avatar]);
-  const [bgIndex, setBgIndex] = React.useState(0);
-  const backgroundSrc = mediaCycle[bgIndex % mediaCycle.length];
 
   return (
     <div className="relative flex flex-col min-h-screen p-4" onClick={() => setBgIndex((i) => i + 1)}>
