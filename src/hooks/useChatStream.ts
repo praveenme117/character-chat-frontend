@@ -44,26 +44,32 @@ export function useChatStream(
       };
       setMessages((prev) => [...prev, aiMessage]);
 
-      source.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.event === "token") {
-          aiMessage.content += data.content;
-          setMessages((prev) => [
-            ...prev.slice(0, -1),
-            { ...aiMessage, content: aiMessage.content },
-          ]);
-        } else if (data.event === "done") {
-          source.close();
-          setIsStreaming(false);
-          // Backend already saves message, no need to save here
-        } else if (data.event === "error") {
-          setError(data.error);
-          source.close();
-          setIsStreaming(false);
-        } else if (data.event === "ping") {
-          console.log("Heartbeat received");
-        }
-      };
+      // Handle named SSE events
+      source.addEventListener("token", (event) => {
+        const data = JSON.parse((event as MessageEvent).data);
+        aiMessage.content += data.content;
+        setMessages((prev) => [
+          ...prev.slice(0, -1),
+          { ...aiMessage, content: aiMessage.content },
+        ]);
+      });
+
+      source.addEventListener("done", () => {
+        source.close();
+        setIsStreaming(false);
+        // Backend already saves message, no need to save here
+      });
+
+      source.addEventListener("error", (event) => {
+        const data = JSON.parse((event as MessageEvent).data);
+        setError(data.error);
+        source.close();
+        setIsStreaming(false);
+      });
+
+      source.addEventListener("ping", () => {
+        console.log("Heartbeat received");
+      });
 
       source.onerror = () => {
         setError("Connection lost. Reconnecting...");

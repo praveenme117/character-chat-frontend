@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 interface CharacterScreenProps {
   avatar: {
     id: number;
@@ -20,15 +22,15 @@ export default function CharacterScreen({ avatar, isStreaming, isTyping }: Chara
   };
 
   return (
-    <video
+    <Image
       src={getCurrentMedia()}
-      autoPlay
-      loop
-      muted
+      alt="Avatar"
       width={200}
       height={200}
       className="rounded-full mb-4"
-      onError={(e) => console.error('Video load error:', e)}
+      priority
+      unoptimized // For GIFs to animate properly
+      onError={(e) => console.error('Image load error:', e)}
     />
   );
 }

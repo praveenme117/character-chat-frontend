@@ -1,58 +1,117 @@
 'use client';
 
-import { avatars } from '@/lib/avatars';
-import axios from 'axios';
-import { useTranslations } from 'next-intl';
-import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import ChatComposer from '@/components/ChatComposer';
+import ChatMessageList from '@/components/ChatMessageList';
+import ChatScreen from '@/components/ChatScreen';
+import ErrorMessage from '@/components/ErrorMessage';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
+import { useChatStream } from '@/hooks/useChatStream';
+import { useConversationHistory } from '@/hooks/useConversationHistory';
 
-export default function Home({ params }: { params: { locale: string } }) {
-  const t = useTranslations('home');
-  const router = useRouter();
-  const [tappedAvatar, setTappedAvatar] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export default function ChatPage({ 
+  params 
+}: { 
+  params: Promise<{ locale: string; id: string }> 
+}) {
+  const searchParams = useSearchParams();
+  const [conversationId, setConversationId] = useState<string>('');
+  
+  useEffect(() => {
+    params.then((p) => setConversationId(p.id));
+  }, [params]);
+  const [userData, setUserData] = useState<{ name: string; city: string } | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
 
-  const handleAvatarTap = async (avatarId: number) => {
-    setTappedAvatar(avatarId);
-    setError(null);
+  // Parse userData from URL params
+  useEffect(() => {
+    const userDataParam = searchParams.get('userData');
+    if (userDataParam) {
+      try {
+        setUserData(JSON.parse(decodeURIComponent(userDataParam)));
+      } catch (error) {
+        console.error('Failed to parse userData:', error);
+        setUserData({ name: 'User', city: 'Unknown' });
+      }
+    } else {
+      setUserData({ name: 'User', city: 'Unknown' });
+    }
+  }, [searchParams]);
+
+  // Load conversation history
+  const { 
+    messages: historyMessages, 
+    setMessages: setHistoryMessages, 
+    avatar, 
+    error: historyError 
+  } = useConversationHistory(conversationId);
+
+  // Chat streaming hook
+  const { 
+    messages: streamMessages, 
+    setMessages: setStreamMessages, 
+    isStreaming, 
+    error: streamError, 
+    sendMessage 
+  } = useChatStream(conversationId, userData || { name: 'User', city: 'Unknown' });
+
+  // Combine history and streaming messages
+  const allMessages = historyMessages.length > 0 ? historyMessages : streamMessages;
+
+  // Update stream messages when history loads
+  useEffect(() => {
+    if (historyMessages.length > 0) {
+      setStreamMessages(historyMessages);
+    }
+  }, [historyMessages, setStreamMessages]);
+
+  const handleSendMessage = async (content: string) => {
+    setIsTyping(true);
     try {
-      const userData = { name: 'User', city: 'Unknown' };
-      const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/session`, {
-        avatarId,
-        userData,
-      });
-      console.log('Session created:', response.data);
-      setTimeout(() => {
-        router.push(`/${params.locale}/chat/${response.data.sessionId}?userData=${encodeURIComponent(JSON.stringify(userData))}`);
-      }, 2000);
-    } catch (error: any) {
-      console.error('Failed to create session:', error);
-      setError(error.response?.data?.error || 'Failed to create session');
-      setTappedAvatar(null);
+      await sendMessage(content);
+    } finally {
+      setIsTyping(false);
     }
   };
 
+  const error = historyError || streamError;
+
+  if (!conversationId || !userData) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div>Loading...</div>
+      </div>
+    );
+  }
+
+  if (!avatar) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div>Loading avatar...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-      {error && <div className="text-red-500 mb-4">{error}</div>}
-      <h1 className="text-2xl mb-8">{t('title')}</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {avatars.map((avatar) => (
-          <div
-            key={avatar.id}
-            className="cursor-pointer transition-transform hover:scale-105"
-            onClick={() => handleAvatarTap(avatar.id)}
-          >
-            <Image
-              src={tappedAvatar === avatar.id ? avatar.tapUrl || avatar.staticUrl : avatar.staticUrl}
-              alt={`Avatar ${avatar.id}`}
-              width={200}
-              height={200}
-              className="rounded-full"
-            />
-          </div>
-        ))}
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+      <LanguageSwitcher />
+      
+      {error && <ErrorMessage message={error} />}
+      
+      <div className="flex flex-col items-center max-w-2xl w-full">
+        <ChatScreen 
+          avatar={avatar} 
+          isStreaming={isStreaming} 
+          isTyping={isTyping} 
+        />
+        
+        <ChatMessageList messages={allMessages} />
+        
+        <ChatComposer 
+          isStreaming={isStreaming} 
+          sendMessage={handleSendMessage} 
+        />
       </div>
     </div>
   );

@@ -4,10 +4,15 @@ import axios from 'axios';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { avatars } from '../../lib/avatars';
 
-export default function Home({ params }: { params: { locale: string } }) {
+export default function Home({ params }: { params: Promise<{ locale: string }> }) {
+  const [locale, setLocale] = useState<string>('en');
+  
+  useEffect(() => {
+    params.then((p) => setLocale(p.locale));
+  }, [params]);
   const t = useTranslations('home');
   const router = useRouter();
   const [tappedAvatar, setTappedAvatar] = useState<number | null>(null);
@@ -24,7 +29,7 @@ export default function Home({ params }: { params: { locale: string } }) {
       });
       console.log('Session created:', response.data);
       setTimeout(() => {
-        router.push(`/${params.locale}/chat/${response.data.sessionId}?userData=${encodeURIComponent(JSON.stringify(userData))}`);
+        router.push(`/${locale}/chat/${response.data.sessionId}?userData=${encodeURIComponent(JSON.stringify(userData))}`);
       }, 2000);
     } catch (error: any) {
       console.error('Failed to create session:', error);

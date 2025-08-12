@@ -18,7 +18,7 @@ export function useConversationHistory(conversationId: string) {
   useEffect(() => {
     const fetchConversation = async () => {
       try {
-        const response = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/conversations/`);
+        const response = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/conversations/${conversationId}`);
         setMessages(response.data.messages.slice(-50)); // Last 50 messages
         setAvatar({
           id: response.data.avatar.id,

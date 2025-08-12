@@ -9,15 +9,12 @@ export default async function LocaleLayout({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  console.log('🔍 LocaleLayout: Locale resolved:', locale);
 
   try {
-    console.log('🔍 LocaleLayout: About to call getMessages()...');
     const messages = await getMessages();
-    console.log('🔍 LocaleLayout: getMessages() succeeded, messages keys:', Object.keys(messages));
 
     return (
-      <html lang={locale}>
+      <html lang={locale || 'en'}>
         <head>
           <link rel="icon" href="/favicon.ico" />
         </head>
@@ -27,9 +24,9 @@ export default async function LocaleLayout({
       </html>
     );
   } catch (error) {
-    console.error('🔍 LocaleLayout: Failed to load messages:', error);
+    console.error('Failed to load messages:', error);
     return (
-      <html lang={locale}>
+      <html lang={locale || 'en'}>
         <head>
           <link rel="icon" href="/favicon.ico" />
         </head>
