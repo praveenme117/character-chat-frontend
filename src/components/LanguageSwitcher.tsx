@@ -1,21 +1,14 @@
 "use client";
 
-import { useRouter, usePathname } from "next/navigation";
-import { useEffect } from "react";
-import axios from "axios";
 import { useConversationStorage } from "@/hooks/useConversationStorage";
+import { api } from "@/lib/api";
+import { usePathname, useRouter } from "next/navigation";
 
 export default function LanguageSwitcher() {
   const router = useRouter();
   const pathname = usePathname();
   const currentLocale = pathname.split("/")[1];
   const { getConversationId, setConversationId } = useConversationStorage();
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    // Touch keys to ensure they exist
-    ["chat_en_sessionId", "chat_ja_sessionId"].forEach(() => {});
-  }, []);
 
   const changeLanguage = async (locale: string) => {
     if (typeof window === "undefined") return;
@@ -31,16 +24,8 @@ export default function LanguageSwitcher() {
       try {
         // Show a lightweight loading state via URL hash (optional)
         router.push(`#loading-${locale}`);
-        // Use seeded user data - randomly pick John from Tokyo or Aiko from Osaka
-        const seededUsers = [
-          { name: 'John', city: 'Tokyo' },
-          { name: 'Aiko', city: 'Osaka' }
-        ];
-        const userData = seededUsers[Math.floor(Math.random() * seededUsers.length)];
-        const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/session`, {
-          avatarId: 1,
-          userData,
-        });
+        const userData = { name: 'User', city: 'Unknown' };
+        const response = await api.post(`/api/session`, { avatarId: 1, userData });
         targetSessionId = response.data.sessionId;
         setConversationId(locale, response.data.sessionId);
       } catch (e) {
@@ -52,15 +37,8 @@ export default function LanguageSwitcher() {
     // Ensure we have a target session id for the destination locale
     if (!targetSessionId) {
       try {
-        const seededUsers = [
-          { name: 'John', city: 'Tokyo' },
-          { name: 'Aiko', city: 'Osaka' }
-        ];
-        const userData = seededUsers[Math.floor(Math.random() * seededUsers.length)];
-        const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/session`, {
-          avatarId: 1,
-          userData,
-        });
+        const userData = { name: 'User', city: 'Unknown' };
+        const response = await api.post(`/api/session`, { avatarId: 1, userData });
         targetSessionId = response.data.sessionId;
         setConversationId(locale, response.data.sessionId);
       } catch (e) {
@@ -70,7 +48,7 @@ export default function LanguageSwitcher() {
     }
 
     // Always navigate to the stored/ensured conversation for that locale
-    const currentUserData = { name: 'John', city: 'Tokyo' }; // Fallback
+    const currentUserData = { name: 'User', city: 'Unknown' };
     const newPath = `/${locale}/chat/${targetSessionId}?userData=${encodeURIComponent(JSON.stringify(currentUserData))}`;
     router.push(newPath);
   };
