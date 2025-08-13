@@ -1,12 +1,8 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
-
-export interface ChatMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-}
+import { getPublicEnv } from "@/config/env";
+import type { ChatMessage } from "@/types";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export function useChatStream(
   conversationId: string,
@@ -19,6 +15,7 @@ export function useChatStream(
   const flushTimerRef = useRef<number | null>(null);
   const tokenBufferRef = useRef<string>("");
   const currentSourceRef = useRef<EventSource | null>(null);
+  const { backendUrl } = getPublicEnv();
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -40,7 +37,7 @@ export function useChatStream(
       }
       
       const source = new EventSource(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/chat/stream?conversationId=${conversationId}&message=${encodeURIComponent(
+        `${backendUrl}/api/chat/stream?conversationId=${conversationId}&message=${encodeURIComponent(
           content
         )}&userData=${encodeURIComponent(JSON.stringify(userData))}&lang=${encodeURIComponent(locale)}`
       );
