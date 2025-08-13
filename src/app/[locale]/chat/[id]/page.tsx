@@ -2,40 +2,30 @@
 
 import React from 'react';
 
-import { useSearchParams, useRouter } from 'next/navigation';
-import { useEffect, useState, useCallback } from 'react';
-import { useConversationStorage } from '@/hooks/useConversationStorage';
-import axios from 'axios';
+import BackgroundMedia from '@/components/BackgroundMedia';
 import ChatComposer from '@/components/ChatComposer';
 import ChatMessageList from '@/components/ChatMessageList';
-import ChatScreen from '@/components/ChatScreen';
 import ErrorMessage from '@/components/ErrorMessage';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
+import SuggestionsBar from '@/components/SuggestionsBar';
 import { useChatStream } from '@/hooks/useChatStream';
 import { useConversationHistory } from '@/hooks/useConversationHistory';
-import BackgroundMedia from '@/components/BackgroundMedia';
-import SuggestionsBar from '@/components/SuggestionsBar';
-import { useMemo } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-export default function ChatPage({ 
-  params 
-}: { 
-  params: Promise<{ locale: string; id: string }> 
-}) {
+export default function ChatPage({ params }: { params: Promise<{ locale: string; id: string }> }) {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const unwrapped = React.use(params);
-  const [conversationId, setConversationId] = useState<string>(unwrapped.id || '');
+  const routeParams = useParams<{ locale: string; id: string }>();
+  const [conversationId, setConversationId] = useState<string>('');
   const [userData, setUserData] = useState<{ name: string; city: string } | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [bgIndex, setBgIndex] = React.useState(0);
   
-  const { getConversationId, setConversationId: storeConversationId } = useConversationStorage();
-  
   useEffect(() => {
-    // Ensure local state reflects route param immediately
-    setConversationId(unwrapped.id || '');
-  }, [unwrapped.id]);
+    // Sync local state with route param
+    setConversationId((routeParams?.id as string) || '');
+  }, [routeParams?.id]);
 
   // Parse userData from URL params
   useEffect(() => {
@@ -105,12 +95,15 @@ export default function ChatPage({
 
   // Update stream messages when history loads
   useEffect(() => {
-    console.log('History messages changed:', historyMessages.length, 'messages');
     if (historyMessages.length > 0) {
-      console.log('Setting stream messages from history:', historyMessages);
-      setStreamMessages(historyMessages);
+      setStreamMessages((prev) => (prev.length === 0 ? historyMessages : prev));
     }
-  }, [historyMessages, setStreamMessages]);
+  }, [conversationId, historyMessages, setStreamMessages]);
+
+  // Clear stream messages when switching to a new conversation
+  useEffect(() => {
+    setStreamMessages([]);
+  }, [conversationId, setStreamMessages]);
 
   // Media cycle for background - must be after avatar is available
   const mediaCycle = useMemo(() => {
@@ -118,8 +111,8 @@ export default function ChatPage({
     return [avatar.staticUrl, avatar.listeningUrl, avatar.speakingUrl];
   }, [avatar]);
 
-  // Combine history and streaming messages
-  const allMessages = historyMessages.length > 0 ? historyMessages : streamMessages;
+  // Always render streaming messages; they are initialized from history
+  const allMessages = streamMessages;
   const backgroundSrc = mediaCycle[bgIndex % mediaCycle.length];
   const error = historyError || streamError;
 
@@ -132,33 +125,7 @@ export default function ChatPage({
     }
   }, [sendMessage]);
 
-  // Function to navigate to stored conversation or create new one
-  const navigateToStoredConversation = useCallback(async (targetLocale: string) => {
-    const storedId = getConversationId(targetLocale);
-    if (storedId) {
-      // Navigate to existing conversation
-      router.push(`/${targetLocale}/chat/${storedId}?userData=${encodeURIComponent(JSON.stringify(userData || { name: 'John', city: 'Tokyo' }))}`);
-    } else {
-      // Create new conversation for this locale
-      try {
-        const seededUsers = [
-          { name: 'John', city: 'Tokyo' },
-          { name: 'Aiko', city: 'Osaka' }
-        ];
-        const newUserData = seededUsers[Math.floor(Math.random() * seededUsers.length)];
-        
-        const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/session`, {
-          avatarId: 1,
-          userData: newUserData,
-        });
-        
-        storeConversationId(targetLocale, response.data.sessionId);
-        router.push(`/${targetLocale}/chat/${response.data.sessionId}?userData=${encodeURIComponent(JSON.stringify(newUserData))}`);
-      } catch (error) {
-        console.error('Failed to create new conversation for locale switch:', error);
-      }
-    }
-  }, [getConversationId, setConversationId, userData, router]);
+  // Navigation handled by LanguageSwitcher
 
   if (!conversationId || !userData) {
     return (
@@ -213,7 +180,7 @@ export default function ChatPage({
             </div>
 
             <div className="mt-auto space-y-2">
-            
+              <SuggestionsBar disabled={isStreaming} onSelect={handleSendMessage} />
               <ChatComposer 
                 isStreaming={isStreaming} 
                 sendMessage={handleSendMessage} 

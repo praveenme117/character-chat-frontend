@@ -1,13 +1,13 @@
 'use client';
 
-import axios from 'axios';
+import BackgroundMedia from '@/components/BackgroundMedia';
+import { useConversationStorage } from '@/hooks/useConversationStorage';
+import { api } from '@/lib/api';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { avatars } from '../../lib/avatars';
-import BackgroundMedia from '@/components/BackgroundMedia';
-import { useConversationStorage } from '@/hooks/useConversationStorage';
 
 export default function Home({ params }: { params: Promise<{ locale: string }> }) {
   const [locale, setLocale] = useState<string>('en');
@@ -45,11 +45,7 @@ export default function Home({ params }: { params: Promise<{ locale: string }> }
       const payload = { avatarId, userData };
       console.log('Sending session creation request:', JSON.stringify(payload, null, 2));
       
-      const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/session`, payload, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await api.post(`/api/session`, payload);
       console.log('Session created successfully:', response.data);
       
       // Store the new conversation ID for this locale
