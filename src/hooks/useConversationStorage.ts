@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { getItemString, setItemString } from '@/utils/storage';
+import { useCallback, useEffect, useState } from 'react';
 
 interface ConversationStorage {
   getConversationId: (locale: string) => string | null;
@@ -18,7 +19,7 @@ export function useConversationStorage(): ConversationStorage {
     if (!isClient) return null;
     try {
       const key = `chat_${locale}_sessionId`;
-      return localStorage.getItem(key);
+      return getItemString(key);
     } catch (error) {
       console.warn('Failed to get conversation ID from localStorage:', error);
       return null;
@@ -29,7 +30,7 @@ export function useConversationStorage(): ConversationStorage {
     if (!isClient) return;
     try {
       const key = `chat_${locale}_sessionId`;
-      localStorage.setItem(key, id);
+      setItemString(key, id);
       console.log(`Stored conversation ID for ${locale}:`, id);
     } catch (error) {
       console.warn('Failed to store conversation ID in localStorage:', error);
@@ -40,7 +41,9 @@ export function useConversationStorage(): ConversationStorage {
     if (!isClient) return;
     try {
       const key = `chat_${locale}_sessionId`;
-      localStorage.removeItem(key);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(key);
+      }
       console.log(`Cleared conversation ID for ${locale}`);
     } catch (error) {
       console.warn('Failed to clear conversation ID from localStorage:', error);
@@ -50,8 +53,10 @@ export function useConversationStorage(): ConversationStorage {
   const clearAllConversations = useCallback((): void => {
     if (!isClient) return;
     try {
-      localStorage.removeItem('chat_en_sessionId');
-      localStorage.removeItem('chat_ja_sessionId');
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('chat_en_sessionId');
+        localStorage.removeItem('chat_ja_sessionId');
+      }
       console.log('Cleared all conversation IDs');
     } catch (error) {
       console.warn('Failed to clear conversation IDs from localStorage:', error);
