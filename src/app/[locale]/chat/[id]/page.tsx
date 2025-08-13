@@ -20,11 +20,12 @@ import { useMemo } from 'react';
 export default function ChatPage({ 
   params 
 }: { 
-  params: { locale: string; id: string } 
+  params: Promise<{ locale: string; id: string }> 
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [conversationId, setConversationId] = useState<string>(params.id || '');
+  const unwrapped = React.use(params);
+  const [conversationId, setConversationId] = useState<string>(unwrapped.id || '');
   const [userData, setUserData] = useState<{ name: string; city: string } | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [bgIndex, setBgIndex] = React.useState(0);
@@ -33,8 +34,8 @@ export default function ChatPage({
   
   useEffect(() => {
     // Ensure local state reflects route param immediately
-    setConversationId(params.id || '');
-  }, [params.id]);
+    setConversationId(unwrapped.id || '');
+  }, [unwrapped.id]);
 
   // Parse userData from URL params
   useEffect(() => {

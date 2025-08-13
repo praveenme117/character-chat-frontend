@@ -42,26 +42,36 @@ export default function LanguageSwitcher() {
           userData,
         });
         targetSessionId = response.data.sessionId;
-        setConversationId(locale, targetSessionId);
+        setConversationId(locale, response.data.sessionId);
       } catch (e) {
         console.error('Failed to create session for language switch:', e);
         targetSessionId = "";
       }
     }
 
-    // Build destination path
-    let newPath = pathname.replace(/^\/[^\/]+/, `/${locale}`);
-    if (isChatRoute) {
-      const id = targetSessionId || parts[2] || "";
-      newPath = `/${locale}/chat/${id}`;
-      
-      // If we have a stored conversation ID, navigate with userData
-      if (targetSessionId) {
-        // Get current userData from URL or use default
-        const currentUserData = { name: 'John', city: 'Tokyo' }; // Default fallback
-        newPath += `?userData=${encodeURIComponent(JSON.stringify(currentUserData))}`;
+    // Ensure we have a target session id for the destination locale
+    if (!targetSessionId) {
+      try {
+        const seededUsers = [
+          { name: 'John', city: 'Tokyo' },
+          { name: 'Aiko', city: 'Osaka' }
+        ];
+        const userData = seededUsers[Math.floor(Math.random() * seededUsers.length)];
+        const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/session`, {
+          avatarId: 1,
+          userData,
+        });
+        targetSessionId = response.data.sessionId;
+        setConversationId(locale, response.data.sessionId);
+      } catch (e) {
+        console.error('Failed to ensure session for target locale:', e);
+        return;
       }
     }
+
+    // Always navigate to the stored/ensured conversation for that locale
+    const currentUserData = { name: 'John', city: 'Tokyo' }; // Fallback
+    const newPath = `/${locale}/chat/${targetSessionId}?userData=${encodeURIComponent(JSON.stringify(currentUserData))}`;
     router.push(newPath);
   };
 
