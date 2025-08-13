@@ -1,10 +1,10 @@
 "use client";
 
+import { api } from "@/lib/api";
+import { avatars } from "@/lib/avatars";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import axios from "axios";
-import { avatars } from "@/lib/avatars";
 
 export default function Home() {
   const router = useRouter();
@@ -19,10 +19,7 @@ export default function Home() {
         { name: 'Aiko', city: 'Osaka' }
       ];
       const userData = seededUsers[Math.floor(Math.random() * seededUsers.length)];
-      const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/session`,
-        { avatarId, userData }
-      );
+      const response = await api.post(`/api/session`, { avatarId, userData });
       setTimeout(() => {
         router.push(
           `/chat/${response.data.sessionId}?userData=${encodeURIComponent(
