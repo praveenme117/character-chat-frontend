@@ -46,7 +46,7 @@ export function useChatStream(
       aiMessageRef.current = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: "",
+        content: "...", // typing placeholder until first token arrives
       };
       setMessages((prev) => [...prev, aiMessageRef.current as ChatMessage]);
 
@@ -59,6 +59,9 @@ export function useChatStream(
           const chunk = tokenBufferRef.current;
           if (!ai || !chunk) return;
           tokenBufferRef.current = "";
+          if (ai.content === "...") {
+            ai.content = ""; // replace placeholder with actual content on first token
+          }
           ai.content += chunk;
           setMessages((prev) => [...prev.slice(0, -1), { ...ai }]);
         }, 40); // ~25fps smoothness
@@ -82,10 +85,17 @@ export function useChatStream(
         // Final flush
         const ai = aiMessageRef.current;
         const chunk = tokenBufferRef.current;
-        if (ai && chunk) {
-          ai.content += chunk;
-          tokenBufferRef.current = "";
-          setMessages((prev) => [...prev.slice(0, -1), { ...ai }]);
+        if (ai) {
+          if (chunk) {
+            if (ai.content === "...") ai.content = ""; // replace placeholder
+            ai.content += chunk;
+            tokenBufferRef.current = "";
+            setMessages((prev) => [...prev.slice(0, -1), { ...ai }]);
+          } else if (ai.content === "...") {
+            // No tokens ever arrived; clear placeholder so it doesn't persist
+            ai.content = "";
+            setMessages((prev) => [...prev.slice(0, -1), { ...ai }]);
+          }
         }
         setIsStreaming(false);
         // Close this message stream naturally
