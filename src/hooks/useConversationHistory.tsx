@@ -1,14 +1,6 @@
-import axios from 'axios';
+import { api } from '@/lib/api';
+import type { Avatar, ChatMessage } from '@/types';
 import { useEffect, useState } from 'react';
-import { ChatMessage } from './useChatStream';
-
-interface Avatar {
-  id: number;
-  staticUrl: string;
-  listeningUrl: string;
-  speakingUrl: string;
-  tapUrl: string;
-}
 
 export function useConversationHistory(conversationId: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -34,10 +26,10 @@ export function useConversationHistory(conversationId: string) {
     
     const fetchConversation = async () => {
       console.log('Fetching conversation history for:', conversationId);
-      console.log('Backend URL:', process.env.NEXT_PUBLIC_BACKEND_URL);
+      // backend URL resolved via api instance; log for debug consistency
       try {
         setLoading(true);
-        const response = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/conversations/${conversationId}`);
+        const response = await api.get(`/api/conversations/${conversationId}`);
         console.log('Conversation response:', response.data);
         console.log('Response status:', response.status);
         
