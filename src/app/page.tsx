@@ -13,7 +13,12 @@ export default function Home() {
   const handleAvatarTap = async (avatarId: number) => {
     setTappedAvatar(avatarId);
     try {
-      const userData = { name: "User", city: "Unknown" }; // Hardcoded for MVP
+      // Use seeded user data - randomly pick John from Tokyo or Aiko from Osaka
+      const seededUsers = [
+        { name: 'John', city: 'Tokyo' },
+        { name: 'Aiko', city: 'Osaka' }
+      ];
+      const userData = seededUsers[Math.floor(Math.random() * seededUsers.length)];
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/session`,
         { avatarId, userData }

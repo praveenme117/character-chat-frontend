@@ -18,6 +18,7 @@ export function useChatStream(
   const aiMessageRef = useRef<ChatMessage | null>(null);
   const flushTimerRef = useRef<number | null>(null);
   const tokenBufferRef = useRef<string>("");
+  const currentSourceRef = useRef<EventSource | null>(null);
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -33,11 +34,17 @@ export function useChatStream(
       setMessages((prev) => [...prev, newMessage]);
 
       const locale = typeof window !== 'undefined' ? (window.location.pathname.split('/')[1] || 'en') : 'en';
+      // Close existing connection if any
+      if (currentSourceRef.current) {
+        currentSourceRef.current.close();
+      }
+      
       const source = new EventSource(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/chat/stream?conversationId=${conversationId}&message=${encodeURIComponent(
           content
         )}&userData=${encodeURIComponent(JSON.stringify(userData))}&lang=${encodeURIComponent(locale)}`
       );
+      currentSourceRef.current = source;
 
       aiMessageRef.current = {
         id: crypto.randomUUID(),
@@ -61,13 +68,20 @@ export function useChatStream(
       };
 
       source.addEventListener("token", (event) => {
-        const data = JSON.parse((event as MessageEvent).data);
-        tokenBufferRef.current += data.content;
-        scheduleFlush();
+        try {
+          const raw = (event as MessageEvent).data;
+          if (!raw) return;
+          const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          if (data && typeof data.content === 'string') {
+            tokenBufferRef.current += data.content;
+            scheduleFlush();
+          }
+        } catch (e) {
+          // Ignore malformed token events
+        }
       });
 
       source.addEventListener("done", () => {
-        source.close();
         // Final flush
         const ai = aiMessageRef.current;
         const chunk = tokenBufferRef.current;
@@ -77,12 +91,24 @@ export function useChatStream(
           setMessages((prev) => [...prev.slice(0, -1), { ...ai }]);
         }
         setIsStreaming(false);
+        // Close this message stream naturally
+        try { source.close(); } catch {}
         // Backend already saves message, no need to save here
       });
 
       source.addEventListener("error", (event) => {
-        const data = JSON.parse((event as MessageEvent).data);
-        setError(data.error);
+        try {
+          const raw = (event as MessageEvent).data;
+          if (raw) {
+            const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (data?.error) setError(data.error);
+            else setError("Connection error");
+          } else {
+            setError("Connection error");
+          }
+        } catch {
+          setError("Connection error");
+        }
         source.close();
         setIsStreaming(false);
       });
@@ -92,27 +118,39 @@ export function useChatStream(
       });
 
       source.onerror = () => {
-        setError("Connection lost. Reconnecting...");
-        source.close();
+        // No automatic retries; surface the error and allow manual resend
+        try { source.close(); } catch {}
         setIsStreaming(false);
-        // Attempt reconnect
-        setTimeout(() => sendMessage(content), 5000);
+        if (!error) setError("Connection error");
       };
 
-      return () => source.close();
+      return () => {
+        // Cleanup function - don't close here, let it stay open for next messages
+      };
     },
     [conversationId, userData]
   );
 
-  // Persist messages client-side per-locale and conversation for quick reloads
-  useEffect(() => {
-    if (typeof window === "undefined" || !conversationId) return;
-    const locale = window.location.pathname.split("/")[1] || "en";
-    const key = `chat_${locale}_messages_${conversationId}`;
-    try {
-      localStorage.setItem(key, JSON.stringify(messages));
-    } catch {}
-  }, [messages, conversationId]);
+  // Do not persist messages to localStorage; rely on server history only
 
-  return { messages, setMessages, isStreaming, error, sendMessage };
+  // Cleanup EventSource when component unmounts or user leaves
+  useEffect(() => {
+    return () => {
+      if (currentSourceRef.current) {
+        console.log('Closing EventSource connection - user left page');
+        currentSourceRef.current.close();
+        currentSourceRef.current = null;
+      }
+    };
+  }, []);
+
+  const closeConnection = useCallback(() => {
+    if (currentSourceRef.current) {
+      console.log('Manually closing EventSource connection');
+      currentSourceRef.current.close();
+      currentSourceRef.current = null;
+    }
+  }, []);
+
+  return { messages, setMessages, isStreaming, error, sendMessage, closeConnection };
 }

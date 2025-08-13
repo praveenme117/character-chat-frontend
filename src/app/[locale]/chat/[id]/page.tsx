@@ -2,8 +2,10 @@
 
 import React from 'react';
 
-import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { useEffect, useState, useCallback } from 'react';
+import { useConversationStorage } from '@/hooks/useConversationStorage';
+import axios from 'axios';
 import ChatComposer from '@/components/ChatComposer';
 import ChatMessageList from '@/components/ChatMessageList';
 import ChatScreen from '@/components/ChatScreen';
@@ -18,17 +20,21 @@ import { useMemo } from 'react';
 export default function ChatPage({ 
   params 
 }: { 
-  params: Promise<{ locale: string; id: string }> 
+  params: { locale: string; id: string } 
 }) {
   const searchParams = useSearchParams();
-  const [conversationId, setConversationId] = useState<string>('');
+  const router = useRouter();
+  const [conversationId, setConversationId] = useState<string>(params.id || '');
   const [userData, setUserData] = useState<{ name: string; city: string } | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [bgIndex, setBgIndex] = React.useState(0);
   
+  const { getConversationId, setConversationId: storeConversationId } = useConversationStorage();
+  
   useEffect(() => {
-    params.then((p) => setConversationId(p.id));
-  }, [params]);
+    // Ensure local state reflects route param immediately
+    setConversationId(params.id || '');
+  }, [params.id]);
 
   // Parse userData from URL params
   useEffect(() => {
@@ -38,19 +44,30 @@ export default function ChatPage({
         setUserData(JSON.parse(decodeURIComponent(userDataParam)));
       } catch (error) {
         console.error('Failed to parse userData:', error);
-        setUserData({ name: 'User', city: 'Unknown' });
+        // Use seeded user data - randomly pick John from Tokyo or Aiko from Osaka
+        const seededUsers = [
+          { name: 'John', city: 'Tokyo' },
+          { name: 'Aiko', city: 'Osaka' }
+        ];
+        setUserData(seededUsers[Math.floor(Math.random() * seededUsers.length)]);
       }
     } else {
-      setUserData({ name: 'User', city: 'Unknown' });
+      // Use seeded user data - randomly pick John from Tokyo or Aiko from Osaka
+      const seededUsers = [
+        { name: 'John', city: 'Tokyo' },
+        { name: 'Aiko', city: 'Osaka' }
+      ];
+      setUserData(seededUsers[Math.floor(Math.random() * seededUsers.length)]);
     }
   }, [searchParams]);
 
-  // Load conversation history
+  // Load conversation history - only when conversationId is available
   const { 
     messages: historyMessages, 
     setMessages: setHistoryMessages, 
     avatar, 
-    error: historyError 
+    error: historyError,
+    loading: historyLoading
   } = useConversationHistory(conversationId);
 
   // Chat streaming hook
@@ -59,12 +76,37 @@ export default function ChatPage({
     setMessages: setStreamMessages, 
     isStreaming, 
     error: streamError, 
-    sendMessage 
+    sendMessage,
+    closeConnection
   } = useChatStream(conversationId, userData || { name: 'User', city: 'Unknown' });
+
+  // Cleanup chat connection when user leaves the page
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      closeConnection();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        closeConnection();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      closeConnection();
+    };
+  }, [closeConnection]);
 
   // Update stream messages when history loads
   useEffect(() => {
+    console.log('History messages changed:', historyMessages.length, 'messages');
     if (historyMessages.length > 0) {
+      console.log('Setting stream messages from history:', historyMessages);
       setStreamMessages(historyMessages);
     }
   }, [historyMessages, setStreamMessages]);
@@ -80,14 +122,42 @@ export default function ChatPage({
   const backgroundSrc = mediaCycle[bgIndex % mediaCycle.length];
   const error = historyError || streamError;
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = useCallback(async (content: string) => {
     setIsTyping(true);
     try {
       await sendMessage(content);
     } finally {
       setIsTyping(false);
     }
-  };
+  }, [sendMessage]);
+
+  // Function to navigate to stored conversation or create new one
+  const navigateToStoredConversation = useCallback(async (targetLocale: string) => {
+    const storedId = getConversationId(targetLocale);
+    if (storedId) {
+      // Navigate to existing conversation
+      router.push(`/${targetLocale}/chat/${storedId}?userData=${encodeURIComponent(JSON.stringify(userData || { name: 'John', city: 'Tokyo' }))}`);
+    } else {
+      // Create new conversation for this locale
+      try {
+        const seededUsers = [
+          { name: 'John', city: 'Tokyo' },
+          { name: 'Aiko', city: 'Osaka' }
+        ];
+        const newUserData = seededUsers[Math.floor(Math.random() * seededUsers.length)];
+        
+        const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/session`, {
+          avatarId: 1,
+          userData: newUserData,
+        });
+        
+        storeConversationId(targetLocale, response.data.sessionId);
+        router.push(`/${targetLocale}/chat/${response.data.sessionId}?userData=${encodeURIComponent(JSON.stringify(newUserData))}`);
+      } catch (error) {
+        console.error('Failed to create new conversation for locale switch:', error);
+      }
+    }
+  }, [getConversationId, setConversationId, userData, router]);
 
   if (!conversationId || !userData) {
     return (
@@ -126,6 +196,12 @@ export default function ChatPage({
         </div>
         
         {error && <ErrorMessage message={error} />}
+        {historyLoading && (
+          <div className="glass-card mb-3 p-3 flex items-center gap-3">
+            <div className="loading-spinner w-5 h-5 border-2 border-white/30 border-t-white" />
+            <span className="text-white/70 text-sm">Loading conversation…</span>
+          </div>
+        )}
         
         {/* Main Chat Area */}
         <div className="flex-1 flex flex-col gap-6 min-h-0">
@@ -136,7 +212,7 @@ export default function ChatPage({
             </div>
 
             <div className="mt-auto space-y-2">
-              <SuggestionsBar disabled={isStreaming} onSelect={handleSendMessage} />
+            
               <ChatComposer 
                 isStreaming={isStreaming} 
                 sendMessage={handleSendMessage} 

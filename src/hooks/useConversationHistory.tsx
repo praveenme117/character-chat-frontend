@@ -14,26 +14,12 @@ export function useConversationHistory(conversationId: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [avatar, setAvatar] = useState<Avatar | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
 
-  // Hydrate from localStorage first for instant UI
-  useEffect(() => {
-    if (typeof window === 'undefined' || !conversationId) return;
-    const locale = window.location.pathname.split('/')[1] || 'en';
-    const key = `chat_${locale}_messages_${conversationId}`;
-    try {
-      const cached = localStorage.getItem(key);
-      if (cached) {
-        const cachedMessages = JSON.parse(cached);
-        console.log('Loaded cached messages:', cachedMessages.length);
-        setMessages(cachedMessages);
-      }
-    } catch (e) {
-      console.warn('Failed to load cached messages:', e);
-    }
-  }, [conversationId]);
+  // Do not hydrate from localStorage; rely solely on server history
 
   useEffect(() => {
-    if (!conversationId) {
+    if (!conversationId || conversationId === '') {
       console.log('No conversationId, skipping history fetch');
       // Set default avatar when no conversation
       setAvatar({
@@ -48,12 +34,20 @@ export function useConversationHistory(conversationId: string) {
     
     const fetchConversation = async () => {
       console.log('Fetching conversation history for:', conversationId);
+      console.log('Backend URL:', process.env.NEXT_PUBLIC_BACKEND_URL);
       try {
+        setLoading(true);
         const response = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/conversations/${conversationId}`);
         console.log('Conversation response:', response.data);
+        console.log('Response status:', response.status);
         
-        if (response.data.messages) {
-          setMessages(response.data.messages.slice(-50)); // Last 50 messages
+        const serverMessages = response.data?.messages;
+        if (Array.isArray(serverMessages) && serverMessages.length > 0) {
+          console.log('Setting messages from response:', serverMessages.length, 'messages');
+          setMessages(serverMessages.slice(-50)); // Last 50 messages
+        } else {
+          // Preserve any cached messages rather than overwriting with empty
+          console.log('No server messages; preserving existing cached messages');
         }
         
         if (response.data.avatar) {
@@ -95,11 +89,13 @@ export function useConversationHistory(conversationId: string) {
         } else {
           setError(error.response?.data?.error || 'Failed to load conversation');
         }
+      } finally {
+        setLoading(false);
       }
     };
     
     fetchConversation();
   }, [conversationId]);
 
-  return { messages, setMessages, avatar, error };
+  return { messages, setMessages, avatar, error, loading };
 }
